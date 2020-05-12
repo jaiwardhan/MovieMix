@@ -1,0 +1,32 @@
+{
+    "mix_mode": "multi",
+    "transition": "static",
+    "ordering": "random",
+    "clipping": {
+        "mode": "clip",
+        "duration": {
+            "min": 10,
+            "max": 50
+        },
+        "bounds": {
+            "start": 0
+        },
+        "compile": "unique"
+    },
+    "output_prefix": "moviemixed-",
+    "format": "mp4",
+    "filler": "looping",
+    "stitch": {
+        "duration": {
+            "min": 60
+        },
+        "resolution": {
+            "strategy": "width"
+        },
+        "frames": {
+            "fps": 60
+        }
+    },
+
+    "iterations": 1
+}
