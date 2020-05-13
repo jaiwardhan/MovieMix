@@ -5,8 +5,8 @@
     "clipping": {
         "mode": "clip",
         "duration": {
-            "min": 10,
-            "max": 50
+            "min": 20,
+            "max": 30
         },
         "bounds": {
             "start": 0
@@ -18,15 +18,17 @@
     "filler": "looping",
     "stitch": {
         "duration": {
-            "min": 60
+            "min": 150,
+            "max": 180
         },
         "resolution": {
             "strategy": "width"
         },
         "frames": {
-            "fps": 60
+            "fps": 60,
+            "bitrate": "35000k"
         }
     },
 
-    "iterations": 1
+    "iterations": 10
 }

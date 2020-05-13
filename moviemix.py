@@ -175,16 +175,23 @@ class Config:
     # -- Constants: Iterations & stitch behavior
     ITER_DEF = 1
     ST_MIN_DEF = -1
+    ST_MAX_DEF = -1
+    
     FILL_LOOP = "looping"
     FILL_TRIM = "trim"
     FILL_DEF = FILL_LOOP
+    
     ST_STRAT_WIDTH = "width"
     ST_STRAT_HEIGHT = "height"
     ST_STRAT_CUSTOM = "custom"
     ST_STRAT_NONE = "none"
     ST_STRAT_DEF = ST_STRAT_NONE
+    
+    ST_BITRATE_DEF = "5000k"
+
     ST_STRAT_H_DEF = -1
     ST_STRAT_W_DEF = -1
+
 
     # -- Constants: Other stitch behaviors
     ST_FPS_DEF = 50
@@ -232,6 +239,9 @@ class Config:
 
     def min_stitch_duration(self):
         return self.config["stitch"]["duration"]["min"] if "stitch" in self.config and "duration" in self.config["stitch"] and "min" in self.config["stitch"]["duration"] else Config.ST_MIN_DEF
+
+    def max_stitch_duration(self):
+        return self.config["stitch"]["duration"]["max"] if "stitch" in self.config and "duration" in self.config["stitch"] and "max" in self.config["stitch"]["duration"] else Config.ST_MAX_DEF
     
     def stitch_strategy(self):
         return self.config["stitch"]["resolution"]["strategy"] if "stitch" in self.config and "resolution" in self.config["stitch"] and "strategy" in self.config["stitch"]["resolution"] else Config.ST_STRAT_DEF
@@ -247,6 +257,9 @@ class Config:
     def fps(self):
         return self.config["stitch"]["frames"]["fps"] if "stitch" in self.config and "frames" in self.config["stitch"] and "fps" in self.config["stitch"]["frames"] else Config.ST_FPS_DEF
     
+    def bitrate(self):
+        return self.config["stitch"]["frames"]["bitrate"] if "stitch" in self.config and "frames" in self.config["stitch"] and "bitrate" in self.config["stitch"]["frames"] else Config.ST_BITRATE_DEF
+
     def filler(self):
         return self.config["filler"] if "filler" in self.config else Config.FILL_DEF
 
@@ -255,6 +268,7 @@ class Config:
         exp["strategy"] = self.stitch_strategy()
         exp["min_duration"] = self.min_stitch_duration()
         exp["fps"] = self.fps()
+        exp["bitrate"] = self.bitrate()
         exp["resolution"] = {}
         exp["resolution"]["w"] = Config.ST_STRAT_W_DEF
         exp["resolution"]["h"] = Config.ST_STRAT_H_DEF
@@ -316,6 +330,7 @@ class Tailor:
         preferred_resolution = MixerUtils.new_clip_resolution(export_config["resolution"]["w"], ["h"])
         min_duration = export_config["min_duration"]
         fps = int(export_config["fps"])
+        bitrate = export_config["bitrate"]
 
         patches = [temp_dir + "/" + Tailor.CLIP_PREFIX + i["name"] for i in clips_config]
         
@@ -325,8 +340,9 @@ class Tailor:
             i = 0
             Utils.log(" [Tailor] Ensuring your attire is of appropriate length")
             while expected_duration < min_duration:
+                # Utils.log("i is %d and exp dur is: %d and min dur is %d" % (i, expected_duration, min_duration))
                 patches.append(temp_dir + "/" + Tailor.CLIP_PREFIX + clips_config[i]["name"])
-                expected_duration = clips_config[i]["duration"]
+                expected_duration = expected_duration + clips_config[i]["duration"]
                 i = (i+1) % len(clips_config)
             Utils.log(" [Tailor] ...done, This combination should look perfect!")
 
@@ -335,7 +351,14 @@ class Tailor:
         cloth_piece = mp.concatenate_videoclips(patches, method="compose")
         
         Utils.log(" [Tailor] Adding final touches")
-        cloth_piece.write_videofile(output_dir + "/" + output_name, codec='mpeg4', audio=False, verbose=False, preset='ultrafast', fps=fps)
+        cloth_piece.write_videofile(
+            output_dir + "/" + output_name, 
+            codec="mpeg4",
+            audio=False, verbose=False, 
+            preset="ultrafast", 
+            fps=fps,
+            bitrate=bitrate
+        )
         
         Utils.log(" [Tailor] Its done!")
         cloth_piece.close()
@@ -383,6 +406,7 @@ class Mixer:
         if is_res_custom:
             resolution.w, resolution.h = self.config.stitch_res_custom()
         total_duration = 0
+        max_st_duration = self.config.max_stitch_duration()
         for each_subject in self.subjects:
             seq_body = { "name": each_subject }
             start_at = 0
@@ -432,6 +456,8 @@ class Mixer:
                 if not is_res_custom:
                     resolution.w, resolution.h = MixerUtils.strategy_select(self.config.stitch_strategy(), resolution, video_clip)
             seq.append(seq_body)
+            if max_st_duration != Config.ST_MAX_DEF and total_duration > max_st_duration:
+                break
         
         # Check the stitch & fill behavior
         stitch_check = self.config.min_stitch_duration() != Config.ST_MIN_DEF
@@ -444,7 +470,7 @@ class Mixer:
         return seq, total_duration, resolution
 
     def stitch_sequence(self, seq, expected_duration, resolution):
-        if len(seq) != len(self.subjects):
+        if len(seq) >= len(self.subjects):
             raise "[x] Generated sequence length (%d) not equal to the number of subjects (%d)" % (len(seq), len(self.subjects))
         
         Utils.create_dir(Mixer.temp_dir, True)
